@@ -2,6 +2,55 @@ import sys
 
 import pandas as pd
 
+def get_samples_DeCock(df, cols, force=True):
+    """
+    Return training and validation data samples using pandas's
+    random sampling and Dean De Cock suggested method.
+
+    De Cock states the following:
+
+    "The two data sets can be easily created by randomizing the original data 
+    and selecting the relevant proportion for each component with the only real
+    requirement being that the number of observations in the training set be six 
+    to ten times the number of variables."
+    
+    when force=True the training dataset lower limit is six times the number
+    of variables (included), when false, the lower limit is the number
+    of variables.
+
+    NOTE: This function could be improved by relaxing the min_validation_size within an 
+    interval.
+    """
+    max_factor = 10
+    min_factor = 6
+
+    # calculate number of rows
+    rows = len(df)
+
+    # this algorithm begins trying with max factor and substracts one until
+    # it finds the mentioned proportion of training/validation data.
+    # Always makes sure validation data size is not less than 20% of the data.    
+    factor = max_factor
+    min_validation_size = round(rows/5)
+
+    if min_validation_size == 0:
+        # dont waste your time.
+        raise ValueError("Dataset too small.")
+
+    while (force and factor >= min_factor) or (factor > 0):
+        training_size = cols*factor
+        validation_size = rows - training_size
+        
+        if (validation_size >= min_validation_size):
+            df_validation = df.sample(n=validation_size)
+            df_training = df.sample(n=training_size)
+            return df_training, df_validation
+        else:
+            factor -= 1
+            continue
+    
+    raise ValueError("Dataset too small.")
+
 def drop_column(df, column):
     """Drop from dataframe 'column'
 
@@ -80,29 +129,3 @@ def join_to_csv(df, output):
     @param output name of the csv file to be written
     """
     return df.to_csv(output)
-
-if __name__ == '__main__':
-    #df = join_by_index('Data/Vacadata1.csv', 'Data/Vacadata2.csv', 'ID')
-    #join_to_csv(df, 'Data/Vacadata_1_2s.csv')
-    df = read_file('Data/animales.csv')
-    df = fix_missing_with_mode(df)
-    df.loc[df['INTERPARTO'] >= 1000, 'INTERPARTO'] = 0
-    df = drop_column(df, 'MADRE')
-
-    #join_to_csv(df, 'Data/Vacadata_animal.csv')
-
-    df_joined = join_by_index('Data/Vacadata_disease.csv', 'Data/Vacadata_Goal.csv', 'ID', 'inner')
-
-    df_joined_2 = do_join(df, df_joined, 'ID', 'inner')
-
-    df_dim = read_file('Data/Vacadata_DIM.csv')
-
-    df_joined_3 = do_join(df_joined_2, df_dim, 'ID', 'inner')
-
-    #join_to_csv(df_joined, 'joined_disease_goal2.csv')
-    #join_to_csv(df_joined2, 'joined_pregnancy_dim.csv')
-    
-    df_dummies = dummies(df_joined_3, ['RAZA', 'PADRE'])
-    print("NUMERO DE COLUMNAS")
-    print(len(df.columns))
-    join_to_csv(df_dummies, 'joined_final_dummies.csv')
